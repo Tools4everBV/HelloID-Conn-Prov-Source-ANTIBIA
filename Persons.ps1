@@ -160,15 +160,6 @@ try {
     Write-Error "Erreur : $_."
 }
 
-# ---------------------------------------------------------------------------
-# REQUÊTE CONTRATS
-# FIX #2 : les correlated subqueries sur PompHistSusp sont remplacées par
-#           un CTE SuspAgg précalculé (un seul scan de la table).
-# FIX #3 : le LEFT JOIN Pomphistunit est borné par une borne haute explicite
-#           pour éviter le produit cartésien partiel.
-# FIX #4 : COALESCE sur les clés nullables dans le PARTITION BY de ROW_NUMBER
-#           pour éviter plusieurs rn=1 pour le même agent.
-# ---------------------------------------------------------------------------
 $contractsQuery = "WITH Radiation AS (
     SELECT P_CLE AS CLEPERS, P_DRAD FROM RH.dbo.POMPERS       WHERE P_DRAD IS NOT NULL
     UNION ALL
@@ -223,7 +214,6 @@ BaseData AS (
 
         COALESCE(r.DATE_RAD, fonc.DATEFIN, terr.DATEFIN, POS.DATEFIN) AS DATE_FIN,
 
-        -- FIX #2 : statut suspension depuis SuspAgg
         CASE WHEN susp.EstSuspenduAujourdhui = 1 THEN 'KO' ELSE 'OK' END AS Statut_SUSP,
 
         CASE
@@ -251,18 +241,13 @@ BaseData AS (
         SELECT *, 'NA' AS SourceType, 0 AS PRIORITE_BASE FROM RH.dbo.Na_histcissec
     ) terr
 
-    -- FIX #3 : borne haute ajoutée sur Pomphistunit pour éviter le produit cartésien partiel
     LEFT JOIN RH.dbo.Pomphistunit fonc
         ON  fonc.CLEPERS = terr.CLEPERS
         AND fonc.DATEDEB <= COALESCE(terr.DATEFIN, '99991231')
         AND (fonc.DATEFIN >= terr.DATEDEB OR fonc.DATEFIN IS NULL)
-
     LEFT JOIN RH.dbo.Pomphistserv serv ON fonc.CLEENREG = serv.CLEENREG
     LEFT JOIN RH.dbo.Pomphistposit POS ON terr.CLEPERS = POS.CLEPERS
-
-    -- FIX #2 : LEFT JOIN sur le CTE précalculé au lieu de correlated subqueries
     LEFT JOIN SuspAgg susp ON susp.CLEPERS = terr.CLEPERS
-
     LEFT JOIN Rad r ON r.CLEPERS = terr.CLEPERS
 ),
 FullResult AS (
@@ -357,8 +342,6 @@ FullResult AS (
 Ranked AS (
     SELECT *,
         ROW_NUMBER() OVER (
-            -- FIX #4 : COALESCE sur les NULLs pour éviter plusieurs rn=1 pour le même agent
-            --          Valeur de fallback en VARCHAR '-1' car les codes sont des varchar dans ANTIBIA
             PARTITION BY CLEPERS,
                          COALESCE(CENTRE_CODE,     '-1'),
                          COALESCE(SERVICE_CODE,    '-1'),
@@ -380,8 +363,6 @@ try {
 
 # ---------------------------------------------------------------------------
 # REQUÊTE MANAGERS
-# FIX #8 : remplacement de la correlated subquery CIS le plus récent
-#           par un CTE avec ROW_NUMBER()
 # ---------------------------------------------------------------------------
 $managersQuery = "WITH CisPlusRecentRanked AS (
     SELECT
@@ -426,7 +407,6 @@ FROM
         AND fonc.DATEDEB >= terr.DATEDEB
         AND (terr.DATEFIN IS NULL OR fonc.DATEDEB <= terr.DATEFIN)
     )
-    -- FIX #8 : LEFT JOIN sur le CTE ROW_NUMBER() au lieu de la correlated subquery
     LEFT JOIN CisPlusRecent ON (RH.dbo.Pompers.P_CLE = CisPlusRecent.CLEPERS)
 WHERE (
     RH_dbo_Pomppfct3.FONCTION IN ('CHEF DE GROUPEMENT','MEDECIN CHEF','CHEF DE SERVICE','DIRECTEUR DEPART.','CHEF DE CIS','INTERIM CHEF DE CENTRE','CHEF DE POLE')
@@ -607,5 +587,4 @@ foreach ($p in $persons) {
     }
 }
 
-# FIX #10 : log final des volumes importés
 Write-Information "Import ANTIBIA terminé : $totalPersonnes personne(s) exportée(s), $totalContrats contrat(s) total."
