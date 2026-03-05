@@ -1,0 +1,41 @@
+{
+  "persons": [
+    { "helloId": "ExternalId",    "antibia": "ExternalId",    "description": "Matricule agent (identifiant unique)" },
+    { "helloId": "DisplayName",   "antibia": "DisplayName",   "description": "NOM Prénom (Matricule)" },
+    { "helloId": "FirstName",     "antibia": "FirstName",     "description": "Prénom (capitalisé)" },
+    { "helloId": "LastName",      "antibia": "LastName",      "description": "Nom de famille (MAJUSCULES)" },
+    { "helloId": "LastNameBirth", "antibia": "LastNameBirth", "description": "Nom de naissance / jeune fille (capitalisé)" },
+    { "helloId": "BirthDate",     "antibia": "BirthDate",     "description": "Date de naissance (MM-dd-yyyy)" },
+    { "helloId": "MobilePhone",   "antibia": "MobilePhone",   "description": "Téléphone mobile personnel (+33...)" },
+    { "helloId": "OfficeMobile",  "antibia": "OfficeMobile",  "description": "Téléphone mobile professionnel (+33...)" },
+    { "helloId": "OfficePhone",   "antibia": "OfficePhone",   "description": "Téléphone bureau" },
+    { "helloId": "PrivateEmail",  "antibia": "PrivateEmail",  "description": "Email personnel" }
+  ],
+  "contracts": [
+    { "helloId": "ExternalID",       "antibia": "ExternalID",       "description": "Identifiant unique du contrat" },
+    { "helloId": "StartDate",        "antibia": "StartDate",        "description": "Date de début (MM-dd-yyyy 00:00:00)" },
+    { "helloId": "EndDate",          "antibia": "EndDate",          "description": "Date de fin (MM-dd-yyyy 23:59:59) - NULL si contrat ouvert" },
+    { "helloId": "Grade",            "antibia": "Grade",            "description": "Grade de l'agent" },
+    { "helloId": "Category",         "antibia": "Category",         "description": "Catégorie : Professionnel / Volontaire / PAT / JSP" },
+    { "helloId": "Title1",           "antibia": "Title1",           "description": "Fonction principale" },
+    { "helloId": "Title2",           "antibia": "Title2",           "description": "Fonction secondaire" },
+    { "helloId": "StatutPosition",   "antibia": "StatutPosition",   "description": "Statut de position : ACTIF / RADIE / DETACHEMENT / etc." },
+    { "helloId": "CenterCode",       "antibia": "CenterCode",       "description": "Code CIS d'affectation principale" },
+    { "helloId": "Center",           "antibia": "Center",           "description": "Libellé CIS d'affectation principale" },
+    { "helloId": "CenterEmail",      "antibia": "CenterEmail",      "description": "Email du CIS" },
+    { "helloId": "TypeCIS",          "antibia": "TypeCIS",          "description": "Type de centre (CSP, CS, CPI...)" },
+    { "helloId": "DepartmentCode",   "antibia": "DepartmentCode",   "description": "Code groupement fonctionnel" },
+    { "helloId": "Department",       "antibia": "Department",       "description": "Libellé groupement fonctionnel" },
+    { "helloId": "DepartmentSigle",  "antibia": "DepartmentSigle",  "description": "Sigle groupement fonctionnel" },
+    { "helloId": "ServiceCode",      "antibia": "ServiceCode",      "description": "Code service" },
+    { "helloId": "Service",          "antibia": "Service",          "description": "Libellé service" },
+    { "helloId": "ServiceSigle",     "antibia": "ServiceSigle",     "description": "Sigle service" },
+    { "helloId": "PoleCode",         "antibia": "PoleCode",         "description": "Code pôle / direction" },
+    { "helloId": "StreetAddress1",   "antibia": "StreetAddress1",   "description": "Adresse ligne 1 du CIS" },
+    { "helloId": "StreetAddress2",   "antibia": "StreetAddress2",   "description": "Adresse ligne 2 du CIS" },
+    { "helloId": "City",             "antibia": "City",             "description": "Ville du CIS" },
+    { "helloId": "PostalCode",       "antibia": "PostalCode",       "description": "Code postal du CIS" },
+    { "helloId": "FTE",              "antibia": "FTE",              "description": "Priorité du contrat (0=secondaire, 1=SPV, 2=SPP/PAT)" },
+    { "helloId": "ManagerID",        "antibia": "ManagerID",        "description": "Matricule du manager résolu par la hiérarchie SDIS" }
+  ]
+}
