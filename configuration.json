@@ -1,0 +1,66 @@
+[
+  {
+    "key": "server",
+    "type": "input",
+    "label": "Serveur SQL",
+    "description": "Nom ou adresse IP du serveur SQL Server hébergeant la base ANTIBIA.",
+    "value": "",
+    "required": true
+  },
+  {
+    "key": "database",
+    "type": "input",
+    "label": "Nom de la base de données",
+    "description": "Nom de la base de données ANTIBIA (généralement 'RH').",
+    "value": "RH",
+    "required": true
+  },
+  {
+    "key": "Port",
+    "type": "input",
+    "label": "Port SQL Server",
+    "description": "Port TCP du serveur SQL Server (par défaut : 1433).",
+    "value": "1433",
+    "required": true
+  },
+  {
+    "key": "username",
+    "type": "input",
+    "label": "Nom d'utilisateur SQL",
+    "description": "Compte SQL utilisé pour la connexion. Laisser vide si Trusted_Connection est utilisée.",
+    "value": "",
+    "required": false
+  },
+  {
+    "key": "password",
+    "type": "password",
+    "label": "Mot de passe SQL",
+    "description": "Mot de passe du compte SQL. Laisser vide si Trusted_Connection est utilisée.",
+    "value": "",
+    "required": false
+  },
+  {
+    "key": "startPeriod",
+    "type": "input",
+    "label": "Date de début d'historique (startPeriod)",
+    "description": "Date à partir de laquelle les agents radiés sont inclus dans l'export. Format obligatoire : MM/dd/yyyy HH:mm:ss (ex : 01/01/2025 00:00:00). À mettre à jour chaque année.",
+    "value": "01/01/2025 00:00:00",
+    "required": true
+  },
+  {
+    "key": "matriculesToExclude",
+    "type": "input",
+    "label": "Matricules à exclure",
+    "description": "Liste des matricules agents à exclure de l'export HelloID, séparés par des virgules (ex : 170071,3115). Laisser vide pour n'exclure personne.",
+    "value": "",
+    "required": false
+  },
+  {
+    "key": "groupementTerritorialKey",
+    "type": "input",
+    "label": "Clé groupement territorial SPV (ANTIBIA)",
+    "description": "Clé ANTIBIA (CLEENREG) du groupement territorial utilisé comme manager de fallback pour les chefs de CIS SPV. Exemple : GPT2T7TG3395547. Laisser vide pour désactiver ce fallback.",
+    "value": "",
+    "required": false
+  }
+]

@@ -1,41 +1,256 @@
 {
-  "persons": [
-    { "helloId": "ExternalId",    "antibia": "ExternalId",    "description": "Matricule agent (identifiant unique)" },
-    { "helloId": "DisplayName",   "antibia": "DisplayName",   "description": "NOM Prénom (Matricule)" },
-    { "helloId": "FirstName",     "antibia": "FirstName",     "description": "Prénom (capitalisé)" },
-    { "helloId": "LastName",      "antibia": "LastName",      "description": "Nom de famille (MAJUSCULES)" },
-    { "helloId": "LastNameBirth", "antibia": "LastNameBirth", "description": "Nom de naissance / jeune fille (capitalisé)" },
-    { "helloId": "BirthDate",     "antibia": "BirthDate",     "description": "Date de naissance (MM-dd-yyyy)" },
-    { "helloId": "MobilePhone",   "antibia": "MobilePhone",   "description": "Téléphone mobile personnel (+33...)" },
-    { "helloId": "OfficeMobile",  "antibia": "OfficeMobile",  "description": "Téléphone mobile professionnel (+33...)" },
-    { "helloId": "OfficePhone",   "antibia": "OfficePhone",   "description": "Téléphone bureau" },
-    { "helloId": "PrivateEmail",  "antibia": "PrivateEmail",  "description": "Email personnel" }
+  "personMappings": [
+    {
+      "name": "Contact.Business.Address.Country",
+      "mode": "fixed",
+      "value": "FRANCE",
+      "validation": { "required": false }
+    },
+    {
+      "name": "Contact.Business.Address.Locality",
+      "mode": "field",
+      "value": "City",
+      "validation": { "required": false }
+    },
+    {
+      "name": "Contact.Business.Address.PostalCode",
+      "mode": "field",
+      "value": "PostalCode",
+      "validation": { "required": false }
+    },
+    {
+      "name": "Contact.Business.Address.Street",
+      "mode": "field",
+      "value": "StreetAddress1",
+      "validation": { "required": false }
+    },
+    {
+      "name": "Contact.Business.Address.StreetExt",
+      "mode": "field",
+      "value": "StreetAddress2",
+      "validation": { "required": false }
+    },
+    {
+      "name": "Contact.Business.Phone.Fixed",
+      "mode": "field",
+      "value": "OfficePhone",
+      "validation": { "required": false }
+    },
+    {
+      "name": "Contact.Business.Phone.Mobile",
+      "mode": "field",
+      "value": "OfficeMobile",
+      "validation": { "required": false }
+    },
+    {
+      "name": "Contact.Personal.Email",
+      "mode": "field",
+      "value": "PrivateEmail",
+      "validation": { "required": false }
+    },
+    {
+      "name": "Contact.Personal.Phone.Mobile",
+      "mode": "field",
+      "value": "MobilePhone",
+      "validation": { "required": false }
+    },
+    {
+      "name": "Details.BirthDate",
+      "mode": "field",
+      "value": "BirthDate",
+      "validation": { "required": false }
+    },
+    {
+      "name": "ExternalId",
+      "mode": "field",
+      "value": "ExternalId",
+      "validation": { "required": false }
+    },
+    {
+      "name": "Name.Convention",
+      "mode": "fixed",
+      "value": "P",
+      "validation": { "required": false }
+    },
+    {
+      "name": "Name.FamilyName",
+      "mode": "field",
+      "value": "LastName",
+      "validation": { "required": true }
+    },
+    {
+      "name": "Name.FamilyNamePartner",
+      "mode": "field",
+      "value": "LastName",
+      "validation": { "required": false }
+    },
+    {
+      "name": "Name.GivenName",
+      "mode": "field",
+      "value": "FirstName",
+      "validation": { "required": false }
+    }
   ],
-  "contracts": [
-    { "helloId": "ExternalID",       "antibia": "ExternalID",       "description": "Identifiant unique du contrat" },
-    { "helloId": "StartDate",        "antibia": "StartDate",        "description": "Date de début (MM-dd-yyyy 00:00:00)" },
-    { "helloId": "EndDate",          "antibia": "EndDate",          "description": "Date de fin (MM-dd-yyyy 23:59:59) - NULL si contrat ouvert" },
-    { "helloId": "Grade",            "antibia": "Grade",            "description": "Grade de l'agent" },
-    { "helloId": "Category",         "antibia": "Category",         "description": "Catégorie : Professionnel / Volontaire / PAT / JSP" },
-    { "helloId": "Title1",           "antibia": "Title1",           "description": "Fonction principale" },
-    { "helloId": "Title2",           "antibia": "Title2",           "description": "Fonction secondaire" },
-    { "helloId": "StatutPosition",   "antibia": "StatutPosition",   "description": "Statut de position : ACTIF / RADIE / DETACHEMENT / etc." },
-    { "helloId": "CenterCode",       "antibia": "CenterCode",       "description": "Code CIS d'affectation principale" },
-    { "helloId": "Center",           "antibia": "Center",           "description": "Libellé CIS d'affectation principale" },
-    { "helloId": "CenterEmail",      "antibia": "CenterEmail",      "description": "Email du CIS" },
-    { "helloId": "TypeCIS",          "antibia": "TypeCIS",          "description": "Type de centre (CSP, CS, CPI...)" },
-    { "helloId": "DepartmentCode",   "antibia": "DepartmentCode",   "description": "Code groupement fonctionnel" },
-    { "helloId": "Department",       "antibia": "Department",       "description": "Libellé groupement fonctionnel" },
-    { "helloId": "DepartmentSigle",  "antibia": "DepartmentSigle",  "description": "Sigle groupement fonctionnel" },
-    { "helloId": "ServiceCode",      "antibia": "ServiceCode",      "description": "Code service" },
-    { "helloId": "Service",          "antibia": "Service",          "description": "Libellé service" },
-    { "helloId": "ServiceSigle",     "antibia": "ServiceSigle",     "description": "Sigle service" },
-    { "helloId": "PoleCode",         "antibia": "PoleCode",         "description": "Code pôle / direction" },
-    { "helloId": "StreetAddress1",   "antibia": "StreetAddress1",   "description": "Adresse ligne 1 du CIS" },
-    { "helloId": "StreetAddress2",   "antibia": "StreetAddress2",   "description": "Adresse ligne 2 du CIS" },
-    { "helloId": "City",             "antibia": "City",             "description": "Ville du CIS" },
-    { "helloId": "PostalCode",       "antibia": "PostalCode",       "description": "Code postal du CIS" },
-    { "helloId": "FTE",              "antibia": "FTE",              "description": "Priorité du contrat (0=secondaire, 1=SPV, 2=SPP/PAT)" },
-    { "helloId": "ManagerID",        "antibia": "ManagerID",        "description": "Matricule du manager résolu par la hiérarchie SDIS" }
+  "contractMappings": [
+    {
+      "name": "Custom.assistantExternalId",
+      "mode": "field",
+      "value": "AssistantID",
+      "validation": { "required": false },
+      "convertToString": true
+    },
+    {
+      "name": "Custom.departmentCode",
+      "mode": "field",
+      "value": "DepartmentSigle",
+      "validation": { "required": false },
+      "convertToString": true
+    },
+    {
+      "name": "Custom.divisionCode",
+      "mode": "field",
+      "value": "ServiceSigle",
+      "validation": { "required": false },
+      "convertToString": true
+    },
+    {
+      "name": "Custom.grade",
+      "mode": "field",
+      "value": "Grade",
+      "validation": { "required": false },
+      "convertToString": true
+    },
+    {
+      "name": "Custom.locationEmail",
+      "mode": "field",
+      "value": "CenterEmail",
+      "validation": { "required": false },
+      "convertToString": true
+    },
+    {
+      "name": "Custom.postalCode",
+      "mode": "field",
+      "value": "PostalCode",
+      "validation": { "required": false },
+      "convertToString": true
+    },
+    {
+      "name": "Custom.Statut",
+      "mode": "field",
+      "value": "StatutPosition",
+      "validation": { "required": false },
+      "convertToString": true
+    },
+    {
+      "name": "Custom.street1",
+      "mode": "field",
+      "value": "StreetAddress1",
+      "validation": { "required": false },
+      "convertToString": true
+    },
+    {
+      "name": "Custom.street2",
+      "mode": "field",
+      "value": "StreetAddress2",
+      "validation": { "required": false },
+      "convertToString": true
+    },
+    {
+      "name": "Custom.Ville",
+      "mode": "field",
+      "value": "City",
+      "validation": { "required": false },
+      "convertToString": true
+    },
+    {
+      "name": "Department.DisplayName",
+      "mode": "field",
+      "value": "Department",
+      "validation": { "required": false }
+    },
+    {
+      "name": "Department.ExternalId",
+      "mode": "field",
+      "value": "DepartmentCode",
+      "validation": { "required": false }
+    },
+    {
+      "name": "Details.Fte",
+      "mode": "field",
+      "value": "FTE",
+      "validation": { "required": false }
+    },
+    {
+      "name": "Division.Code",
+      "mode": "field",
+      "value": "ServiceCode",
+      "validation": { "required": false }
+    },
+    {
+      "name": "Division.ExternalId",
+      "mode": "field",
+      "value": "ServiceCode",
+      "validation": { "required": false }
+    },
+    {
+      "name": "Division.Name",
+      "mode": "field",
+      "value": "Service",
+      "validation": { "required": false }
+    },
+    {
+      "name": "EndDate",
+      "mode": "field",
+      "value": "EndDate",
+      "validation": { "required": false }
+    },
+    {
+      "name": "ExternalId",
+      "mode": "field",
+      "value": "ExternalID",
+      "validation": { "required": false }
+    },
+    {
+      "name": "Location.Code",
+      "mode": "field",
+      "value": "TypeCIS",
+      "validation": { "required": false }
+    },
+    {
+      "name": "Location.ExternalId",
+      "mode": "field",
+      "value": "CenterCode",
+      "validation": { "required": false }
+    },
+    {
+      "name": "Location.Name",
+      "mode": "field",
+      "value": "Center",
+      "validation": { "required": false }
+    },
+    {
+      "name": "Manager.ExternalId",
+      "mode": "field",
+      "value": "ManagerID",
+      "validation": { "required": false }
+    },
+    {
+      "name": "StartDate",
+      "mode": "field",
+      "value": "StartDate",
+      "validation": { "required": false }
+    },
+    {
+      "name": "Title.Name",
+      "mode": "complex",
+      "value": "function getTitle(){\n    let title1 = sourceContract.Title1\n    let title2 = sourceContract.Title2\n    let title\n    if(title1){\n        if (title2) {\n            title = title1 + \" - \" + title2;\n        } else {\n            title = title1\n        }\n    }else{\n        title = title2\n    }\n    return title\n}\ngetTitle()",
+      "validation": { "required": false }
+    },
+    {
+      "name": "Type.Description",
+      "mode": "field",
+      "value": "Category",
+      "validation": { "required": false }
+    }
   ]
 }
