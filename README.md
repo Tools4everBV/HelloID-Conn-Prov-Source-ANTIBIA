@@ -2,7 +2,7 @@
 
 > ℹ️ Ce dépôt contient uniquement le connecteur et le code de configuration. L'implémenteur est responsable de l'obtention des informations de connexion (serveur, base de données, compte SQL). Veuillez contacter le gestionnaire applicatif du client pour coordonner les prérequis.
 
-![Logo](https://www.antibia.com/wp-content/uploads/2023/10/logo-Antibia-768x208.png)
+![Logo](https://media.licdn.com/dms/image/v2/D4E3DAQE7HoWsY5epHA/image-scale_191_1128/image-scale_191_1128/0/1698053055557/antibia_cover?e=2147483647&v=beta&t=3wDjWj4iBzmsnTWDU0ZHCmYa3Odqf1QO-k42XbPhP3A)
 
 ## Table des matières
 
