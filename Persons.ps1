@@ -7,7 +7,7 @@ $connectionString = "Server=$server,$Port;Database=$database;Trusted_Connection=
 
 # Paramètres métier variabilisés depuis la configuration HelloID
 # startPeriod : date de début pour l'inclusion des agents radiés (format MM/dd/yyyy HH:mm:ss)
-$startPeriod = if ($config.startPeriod) { $config.startPeriod } else { "01/01/2025 00:00:00" }
+$startPeriod = $config.startPeriod 
 
 # matriculesToExclude : liste des matricules à exclure de l'export (séparés par des virgules)
 $MatriculesAExclure = if ($config.matriculesToExclude) {
@@ -174,16 +174,68 @@ Rad AS (
     FROM Radiation
     GROUP BY CLEPERS
 ),
--- FIX #2 : précalcul des bornes de suspension par agent (remplace 6 correlated subqueries)
-SuspAgg AS (
+-- Suspension future : prochaine suspension dont DATEDEB > aujourd'hui
+-- Utilisée pour (1) recalculer DATE_DEBUT et (2) borner DATE_FIN d'un contrat ouvert
+SuspFuture AS (
+    SELECT CLEPERS, MIN(DATEDEB) AS DATE_DEB_SUSP_FUTURE
+    FROM RH.dbo.PompHistSusp
+    WHERE DATEDEB > CAST(GETDATE() AS DATE)
+    GROUP BY CLEPERS
+),
+-- Suspension passée ou en cours (DATEDEB <= aujourd'hui)
+-- DATE_FIN_SUSP_PASSEE sert à recalculer DATE_DEBUT après levée de suspension
+-- EstSuspenduAujourdhui alimente Statut_SUSP (remplace FIX #2 SuspAgg)
+SuspPassee AS (
     SELECT
         CLEPERS,
-        MIN(DATEDEB) AS DATE_DEB_SUSP,
-        MAX(DATEFIN) AS DATE_FIN_SUSP,
+        MIN(DATEDEB) AS DATE_DEB_SUSP_PASSEE,
+        MAX(DATEFIN)  AS DATE_FIN_SUSP_PASSEE,
         MAX(CASE WHEN DATEDEB <= CAST(GETDATE() AS DATE)
                   AND (DATEFIN >= CAST(GETDATE() AS DATE) OR DATEFIN IS NULL)
              THEN 1 ELSE 0 END) AS EstSuspenduAujourdhui
     FROM RH.dbo.PompHistSusp
+    WHERE DATEDEB <= CAST(GETDATE() AS DATE)
+    GROUP BY CLEPERS
+),
+-- Disponibilité en cours (CLEPOSIT=4, commencée, toujours active)
+-- → DATE_FIN du contrat ouvert = DATE_DEB_DISP_EN_COURS
+DispEnCours AS (
+    SELECT CLEPERS, MIN(DATEDEB) AS DATE_DEB_DISP_EN_COURS
+    FROM RH.dbo.Pomphistposit
+    WHERE CLEPOSIT = 4
+      AND DATEDEB <= CAST(GETDATE() AS DATE)
+      AND (DATEFIN IS NULL OR DATEFIN >= CAST(GETDATE() AS DATE))
+    GROUP BY CLEPERS
+),
+-- Disponibilité future (CLEPOSIT=4, DATEDEB > aujourd'hui)
+-- → DATE_FIN du contrat ouvert = DATE_DEB_DISP_FUTURE
+DispFuture AS (
+    SELECT CLEPERS, MIN(DATEDEB) AS DATE_DEB_DISP_FUTURE
+    FROM RH.dbo.Pomphistposit
+    WHERE CLEPOSIT = 4
+      AND DATEDEB > CAST(GETDATE() AS DATE)
+    GROUP BY CLEPERS
+),
+-- Détachement externe en cours (CLEPOSIT=2, hors sous-positions internes 11/21/23, toujours actif)
+-- Les sous-positions 11, 21, 23 sont des détachements internes → ne ferment PAS le contrat
+-- → DATE_FIN du contrat ouvert = DATE_DEB_DETACH_EN_COURS
+DetachEnCours AS (
+    SELECT CLEPERS, MIN(DATEDEB) AS DATE_DEB_DETACH_EN_COURS
+    FROM RH.dbo.Pomphistposit
+    WHERE CLEPOSIT = 2
+      AND CLESPOSIT NOT IN (11, 21, 23)
+      AND DATEDEB <= CAST(GETDATE() AS DATE)
+      AND (DATEFIN IS NULL OR DATEFIN >= CAST(GETDATE() AS DATE))
+    GROUP BY CLEPERS
+),
+-- Détachement externe futur (CLEPOSIT=2, hors 11/21/23, DATEDEB > aujourd'hui)
+-- → DATE_FIN du contrat ouvert = DATE_DEB_DETACH_FUTUR
+DetachFutur AS (
+    SELECT CLEPERS, MIN(DATEDEB) AS DATE_DEB_DETACH_FUTUR
+    FROM RH.dbo.Pomphistposit
+    WHERE CLEPOSIT = 2
+      AND CLESPOSIT NOT IN (11, 21, 23)
+      AND DATEDEB > CAST(GETDATE() AS DATE)
     GROUP BY CLEPERS
 ),
 BaseData AS (
@@ -194,9 +246,9 @@ BaseData AS (
         fonc.CLEUNIT,
         serv.CLESERV,
 
-        -- FIX #2 : lecture depuis SuspAgg au lieu de correlated subqueries
-        susp.DATE_DEB_SUSP,
-        susp.DATE_FIN_SUSP,
+        -- Dates suspension brutes (information)
+        sp.DATE_DEB_SUSP_PASSEE AS DATE_DEB_SUSP,
+        sp.DATE_FIN_SUSP_PASSEE AS DATE_FIN_SUSP,
 
         POS.DATEDEB AS DATE_DEB_POS,
         POS.DATEFIN AS DATE_FIN_POS,
@@ -205,17 +257,41 @@ BaseData AS (
         terr.PRIORITE_BASE,
         r.DATE_RAD,
 
+        -- DATE_FIN naturelle du contrat (sans logique suspension/dispo/détachement) :
+        -- Priorité : radiation > fin fonctionnelle > fin territoriale > fin position active.
+        -- POS.DATEFIN ignorée si la position est déjà clôturée (évite pollution de la date de fin).
+        COALESCE(
+            r.DATE_RAD,
+            fonc.DATEFIN,
+            terr.DATEFIN,
+            CASE
+                WHEN POS.DATEFIN IS NULL OR POS.DATEFIN >= CAST(GETDATE() AS DATE)
+                THEN POS.DATEFIN
+                ELSE NULL
+            END
+        ) AS DATE_FIN_NATURELLE,
+
+        -- DATE_DEBUT :
+        -- Cas 1 : Suspension future uniquement (pas de suspension passée impactante)
+        --         → date de début du contrat inchangée
+        -- Cas 2 : Suspension passée/en cours couvrant la date de début originale
+        --         → DATE_DEBUT = DATE_FIN_SUSP_PASSEE + 1 jour
+        -- Cas 3 : Aucune suspension impactante → date de début inchangée
         CASE
-            WHEN susp.DATE_FIN_SUSP IS NOT NULL
-                 AND susp.DATE_FIN_SUSP >= COALESCE(fonc.DATEDEB, terr.DATEDEB)
-            THEN DATEADD(DAY, 1, susp.DATE_FIN_SUSP)
+            WHEN sf.DATE_DEB_SUSP_FUTURE IS NOT NULL
+                 AND (sp.DATE_FIN_SUSP_PASSEE IS NULL
+                      OR sp.DATE_FIN_SUSP_PASSEE < COALESCE(fonc.DATEDEB, terr.DATEDEB))
+            THEN COALESCE(fonc.DATEDEB, terr.DATEDEB)
+            WHEN sp.DATE_FIN_SUSP_PASSEE IS NOT NULL
+                 AND sp.DATE_FIN_SUSP_PASSEE >= COALESCE(fonc.DATEDEB, terr.DATEDEB)
+            THEN DATEADD(DAY, 1, sp.DATE_FIN_SUSP_PASSEE)
             ELSE COALESCE(fonc.DATEDEB, terr.DATEDEB)
         END AS DATE_DEBUT,
 
-        COALESCE(r.DATE_RAD, fonc.DATEFIN, terr.DATEFIN, POS.DATEFIN) AS DATE_FIN,
+        -- Statut suspension (en cours aujourd'hui) — via SuspPassee.EstSuspenduAujourdhui
+        CASE WHEN sp.EstSuspenduAujourdhui = 1 THEN 'KO' ELSE 'OK' END AS Statut_SUSP,
 
-        CASE WHEN susp.EstSuspenduAujourdhui = 1 THEN 'KO' ELSE 'OK' END AS Statut_SUSP,
-
+        -- Statut position
         CASE
             WHEN r.DATE_RAD IS NOT NULL AND r.DATE_RAD <= CAST(GETDATE() AS DATE) THEN 'KO'
             WHEN POS.CLEPOSIT IS NULL THEN 'OK'
@@ -229,7 +305,14 @@ BaseData AS (
         END AS Statut_POSIT,
 
         POS.CLEPOSIT,
-        POS.CLESPOSIT
+        POS.CLESPOSIT,
+
+        -- Tous les événements impactant DATE_FIN, transmis aux CTEs suivants
+        sf.DATE_DEB_SUSP_FUTURE,
+        dc.DATE_DEB_DISP_EN_COURS,
+        df.DATE_DEB_DISP_FUTURE,
+        dtc.DATE_DEB_DETACH_EN_COURS,
+        dtf.DATE_DEB_DETACH_FUTUR
 
     FROM (
         SELECT *, 'RH' AS SourceType, 1 AS PRIORITE_BASE FROM RH.dbo.Pomphistcis
@@ -241,14 +324,20 @@ BaseData AS (
         SELECT *, 'NA' AS SourceType, 0 AS PRIORITE_BASE FROM RH.dbo.Na_histcissec
     ) terr
 
+    -- FIX #3 : borne haute ajoutée pour éviter le produit cartésien partiel
     LEFT JOIN RH.dbo.Pomphistunit fonc
         ON  fonc.CLEPERS = terr.CLEPERS
         AND fonc.DATEDEB <= COALESCE(terr.DATEFIN, '99991231')
         AND (fonc.DATEFIN >= terr.DATEDEB OR fonc.DATEFIN IS NULL)
-    LEFT JOIN RH.dbo.Pomphistserv serv ON fonc.CLEENREG = serv.CLEENREG
-    LEFT JOIN RH.dbo.Pomphistposit POS ON terr.CLEPERS = POS.CLEPERS
-    LEFT JOIN SuspAgg susp ON susp.CLEPERS = terr.CLEPERS
-    LEFT JOIN Rad r ON r.CLEPERS = terr.CLEPERS
+    LEFT JOIN RH.dbo.Pomphistserv  serv ON fonc.CLEENREG  = serv.CLEENREG
+    LEFT JOIN RH.dbo.Pomphistposit POS  ON terr.CLEPERS   = POS.CLEPERS
+    LEFT JOIN Rad           r    ON r.CLEPERS    = terr.CLEPERS
+    LEFT JOIN SuspFuture    sf   ON sf.CLEPERS   = terr.CLEPERS
+    LEFT JOIN SuspPassee    sp   ON sp.CLEPERS   = terr.CLEPERS
+    LEFT JOIN DispEnCours   dc   ON dc.CLEPERS   = terr.CLEPERS
+    LEFT JOIN DispFuture    df   ON df.CLEPERS   = terr.CLEPERS
+    LEFT JOIN DetachEnCours dtc  ON dtc.CLEPERS  = terr.CLEPERS
+    LEFT JOIN DetachFutur   dtf  ON dtf.CLEPERS  = terr.CLEPERS
 ),
 FullResult AS (
     SELECT
@@ -273,8 +362,48 @@ FullResult AS (
 
         FORMAT(aff.DATE_DEBUT, 'MM-dd-yyyy 00:00:00') AS DATE_DEBUT,
 
+        -- DATE_FIN finale :
+        -- Un contrat déjà terminé (DATE_FIN_NATURELLE dans le passé) est toujours inchangé.
+        -- Pour les contrats ouverts, priorité des événements impactants :
+        --   1. Dispo en cours et/ou détachement externe en cours → le plus ancien des deux
+        --   2. Événements futurs (suspension / dispo / détachement externe) → le plus proche (MIN)
+        --   3. Aucun événement → DATE_FIN_NATURELLE
         FORMAT(
-            COALESCE(aff.DATE_RAD, aff.DATE_FIN, aff.DATE_FIN_POS),
+            CASE
+                -- Contrat déjà terminé → inchangé
+                WHEN aff.DATE_FIN_NATURELLE IS NOT NULL
+                     AND aff.DATE_FIN_NATURELLE < CAST(GETDATE() AS DATE)
+                THEN aff.DATE_FIN_NATURELLE
+
+                -- Contrat ouvert : événement(s) en cours (dispo et/ou détachement externe)
+                WHEN aff.DATE_DEB_DISP_EN_COURS IS NOT NULL
+                  OR aff.DATE_DEB_DETACH_EN_COURS IS NOT NULL
+                THEN
+                    CASE
+                        WHEN aff.DATE_DEB_DISP_EN_COURS IS NOT NULL
+                             AND aff.DATE_DEB_DETACH_EN_COURS IS NOT NULL
+                        THEN CASE WHEN aff.DATE_DEB_DISP_EN_COURS <= aff.DATE_DEB_DETACH_EN_COURS
+                                  THEN aff.DATE_DEB_DISP_EN_COURS
+                                  ELSE aff.DATE_DEB_DETACH_EN_COURS END
+                        WHEN aff.DATE_DEB_DISP_EN_COURS IS NOT NULL THEN aff.DATE_DEB_DISP_EN_COURS
+                        ELSE aff.DATE_DEB_DETACH_EN_COURS
+                    END
+
+                -- Contrat ouvert : événements futurs uniquement → date la plus proche
+                WHEN aff.DATE_DEB_SUSP_FUTURE   IS NOT NULL
+                  OR aff.DATE_DEB_DISP_FUTURE   IS NOT NULL
+                  OR aff.DATE_DEB_DETACH_FUTUR  IS NOT NULL
+                THEN (
+                    SELECT MIN(d) FROM (VALUES
+                        (aff.DATE_DEB_SUSP_FUTURE),
+                        (aff.DATE_DEB_DISP_FUTURE),
+                        (aff.DATE_DEB_DETACH_FUTUR)
+                    ) AS v(d) WHERE d IS NOT NULL
+                )
+
+                -- Aucun événement → DATE_FIN naturelle
+                ELSE aff.DATE_FIN_NATURELLE
+            END,
             'MM-dd-yyyy 23:59:59'
         ) AS DATE_FIN,
 
@@ -284,7 +413,7 @@ FullResult AS (
         FORMAT(aff.DATE_FIN_POS,  'MM-dd-yyyy 23:59:59') AS DATE_FIN_POS,
 
         CASE
-            WHEN aff.DATE_RAD IS NOT NULL THEN 'INACTIF'
+            WHEN aff.DATE_RAD IS NOT NULL                            THEN 'INACTIF'
             WHEN aff.Statut_POSIT = 'OK' AND aff.Statut_SUSP = 'OK' THEN 'ACTIF'
             ELSE 'INACTIF'
         END AS Statut_POSIT_FINAL,
@@ -316,7 +445,12 @@ FullResult AS (
         CASE
             WHEN aff.PRIORITE_BASE = 1 THEN IIF(cat.CATEGORIE = 'Volontaire', 1, 2)
             ELSE 0
-        END AS PRIORITE
+        END AS PRIORITE,
+
+        -- Colonnes brutes conservées pour le CTE DateFinEffective (filtre WHERE + ORDER BY)
+        aff.DATE_FIN_NATURELLE,
+        aff.DATE_DEB_DISP_EN_COURS,   aff.DATE_DEB_DETACH_EN_COURS,
+        aff.DATE_DEB_SUSP_FUTURE,     aff.DATE_DEB_DISP_FUTURE,    aff.DATE_DEB_DETACH_FUTUR
 
     FROM BaseData aff
     JOIN (
@@ -337,11 +471,42 @@ FullResult AS (
     LEFT JOIN RH.dbo.Pomppfct   fn2    ON p.P_FONC2         = fn2.CLEFONC
     LEFT JOIN RH.dbo.Pompgserv  unit   ON aff.CLEUNIT       = unit.CLE_GRPFONC
     LEFT JOIN RH.dbo.Pompserv   serv   ON aff.CLESERV       = serv.CLESER
-    WHERE aff.DATE_FIN >= '$startPeriod' OR aff.DATE_FIN IS NULL
+),
+-- CTE dédié : calcul factorisé de DATE_FIN_EFFECTIVE (même logique que FORMAT DATE_FIN ci-dessus)
+-- Évite de dupliquer le CASE dans le WHERE et dans le ORDER BY
+DateFinEffective AS (
+    SELECT *,
+        CASE
+            WHEN DATE_FIN_NATURELLE IS NOT NULL
+                 AND DATE_FIN_NATURELLE < CAST(GETDATE() AS DATE)
+            THEN DATE_FIN_NATURELLE
+            WHEN DATE_DEB_DISP_EN_COURS IS NOT NULL OR DATE_DEB_DETACH_EN_COURS IS NOT NULL
+            THEN
+                CASE
+                    WHEN DATE_DEB_DISP_EN_COURS IS NOT NULL AND DATE_DEB_DETACH_EN_COURS IS NOT NULL
+                    THEN CASE WHEN DATE_DEB_DISP_EN_COURS <= DATE_DEB_DETACH_EN_COURS
+                              THEN DATE_DEB_DISP_EN_COURS ELSE DATE_DEB_DETACH_EN_COURS END
+                    WHEN DATE_DEB_DISP_EN_COURS IS NOT NULL THEN DATE_DEB_DISP_EN_COURS
+                    ELSE DATE_DEB_DETACH_EN_COURS
+                END
+            WHEN DATE_DEB_SUSP_FUTURE  IS NOT NULL
+              OR DATE_DEB_DISP_FUTURE  IS NOT NULL
+              OR DATE_DEB_DETACH_FUTUR IS NOT NULL
+            THEN (
+                SELECT MIN(d) FROM (VALUES
+                    (DATE_DEB_SUSP_FUTURE),
+                    (DATE_DEB_DISP_FUTURE),
+                    (DATE_DEB_DETACH_FUTUR)
+                ) AS v(d) WHERE d IS NOT NULL
+            )
+            ELSE DATE_FIN_NATURELLE
+        END AS DATE_FIN_EFFECTIVE
+    FROM FullResult
 ),
 Ranked AS (
     SELECT *,
         ROW_NUMBER() OVER (
+            -- FIX #4 : fallback VARCHAR '-1' (les codes sont varchar dans ANTIBIA, pas int)
             PARTITION BY CLEPERS,
                          COALESCE(CENTRE_CODE,     '-1'),
                          COALESCE(SERVICE_CODE,    '-1'),
@@ -350,7 +515,8 @@ Ranked AS (
                      CASE WHEN Statut_POSIT_FINAL = 'ACTIF' THEN 1 ELSE 2 END,
                      DATE_FIN DESC
         ) AS rn
-    FROM FullResult
+    FROM DateFinEffective
+    WHERE DATE_FIN_EFFECTIVE >= '$startPeriod' OR DATE_FIN_EFFECTIVE IS NULL
 )
 SELECT * FROM Ranked WHERE rn = 1;
 "
@@ -472,7 +638,7 @@ $totalContrats  = 0
 foreach ($p in $persons) {
     $person = @{}
     $person["ExternalId"]    = $p.MATRICULE
-    # FIX #9 : Capitalize-Name maintenant appliqué sur les prénoms et noms
+    # FIX #9 : Capitalize-Name appliqué sur les prénoms et noms
     $person["DisplayName"]   = "$($p.P_NOM) $(Capitalize-Name $p.P_PREN) ($($p.MATRICULE))"
     $person["FirstName"]     = Capitalize-Name $p.P_PREN
     $person["LastName"]      = $p.P_NOM
@@ -564,8 +730,7 @@ foreach ($p in $persons) {
                 [void]$person.Contracts.Add($contract)
             }
             else {
-                # FIX #5 : les deux ParseExact utilisent maintenant le MÊME séparateur "-"
-                #          pour éviter la bombe à retardement MM-dd vs MM/dd
+                # FIX #5 : les deux ParseExact utilisent le MÊME séparateur pour éviter MM-dd vs MM/dd
                 try {
                     $DateDeFinContrat = [datetime]::ParseExact($c.DATE_FIN,   "MM-dd-yyyy HH:mm:ss", $null)
                     $DateDeFinMax     = [datetime]::ParseExact($startPeriod,   "MM/dd/yyyy HH:mm:ss", $null)
